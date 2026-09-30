@@ -1,0 +1,20 @@
+# Виртуальное окружение и кэши инструментов
+.venv
+__pycache__
+*.py[cod]
+.mypy_cache
+.pytest_cache
+.ruff_cache
+
+# Служебные файлы проекта
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml
+.env
+*.log
+
+# Не нужны внутри образа
+tests/
+README.md

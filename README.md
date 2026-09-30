@@ -10,6 +10,8 @@
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) (зависимости зафиксированы в `pyproject.toml` / `uv.lock`)
 - Библиотека `requests` (подтягивается командой `uv sync`)
+- Docker с плагином Compose — только для запуска через `docker compose`
+  (см. раздел «Запуск в Docker»)
 
 ## Запуск
 
@@ -20,6 +22,46 @@ uv run main.py http://spd-rudp.hostkey.ru/files/10mb.bin    # адрес арг�
 uv run main.py                                              # адрес будет запрошен в консоли
 uv run main.py speedtest.selectel.ru/10MB                   # без схемы -> подставится https://
 ```
+
+## Запуск в Docker
+
+```bash
+docker compose build        # собрать образ speed-test
+docker compose up           # запускает замер по адресу по умолчанию (10 МБ × 10 запросов)
+
+# свой адрес — переменной окружения (или строкой SPEED_TEST_URL=... в файле .env)
+SPEED_TEST_URL=speedtest.selectel.ru/100MB docker compose up
+
+# адрес и флаги main.py — аргументами после имени сервиса
+docker compose run --rm speed-test http://spd-rudp.hostkey.ru/files/10mb.bin -n 5
+docker compose run --rm speed-test speedtest.selectel.ru/10MB -q
+
+# адрес спрашивается в консоли (как `uv run main.py` без аргументов)
+docker compose run --rm --entrypoint python speed-test main.py
+```
+
+Как это работает:
+
+- `docker compose up` сразу запускает `main.py` с адресом по умолчанию
+  (`http://spd-rudp.hostkey.ru/files/10mb.bin` из таблицы ниже). Другой адрес задаётся
+  переменной `SPEED_TEST_URL` — командой (см. пример) или строкой в `.env` рядом с
+  `docker-compose.yml`. После замера контейнер завершается, а `docker compose up`
+  возвращает код возврата скрипта: `0` — замер удался, `1` — ни один запрос не прошёл.
+- Аргументы после имени сервиса полностью перекрывают команду сервиса и дописываются к
+  `ENTRYPOINT ["python", "main.py"]`, поэтому доступны все опции скрипта:
+  `-n/--count`, `-t/--timeout`, `--no-cache-bust`, `-q`.
+- Ввод адреса вручную (`--entrypoint python … main.py`) работает благодаря `stdin_open: true`
+  в `docker-compose.yml`; прогресс «Запрос 1/10 …» печатается построчно
+  (`PYTHONUNBUFFERED=1` в `Dockerfile`). Именно `run` (а не `up`) используется для интерактива:
+  `docker compose up` stdin в контейнер не прокидывает, поэтому там замер стартует сразу
+  по адресу из `SPEED_TEST_URL`.
+- Зависимости внутри образа ставятся командой `uv sync --frozen` строго по `uv.lock`,
+  запуск идёт от непривилегированного пользователя `app`.
+- Замер выполняется с сетевого стека контейнера (bridge + NAT). На Linux, чтобы исключить
+  NAT и получить самый «честный» результат, можно раскомментировать в `docker-compose.yml`
+  строку `network_mode: host` (в Docker Desktop на macOS/Windows этот режим не работает).
+- Подсказки интерактивного меню `compose` («w Enable Watch / d Detach») в выводе можно
+  убрать: `COMPOSE_MENU=0 docker compose up`.
 
 ## Готовые адреса для замера (доступны из РФ, без VPN)
 

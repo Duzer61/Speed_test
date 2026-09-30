@@ -1,0 +1,20 @@
+services:
+  speed-test:
+    build: .
+    image: speed-test:latest
+    container_name: speed-test
+    # Что запускать: по умолчанию — основной адрес из README (10 МБ × 10 запросов).
+    # Свой адрес задаётся переменной окружения:
+    #   SPEED_TEST_URL=speedtest.selectel.ru/100MB docker compose up
+    # (или строкой SPEED_TEST_URL=... в файле .env рядом с docker-compose.yml)
+    command: ["${SPEED_TEST_URL:-http://spd-rudp.hostkey.ru/files/10mb.bin}"]
+    # Консольный ввод-вывод нужен, когда main.py сам спрашивает адрес:
+    #   docker compose run --rm --entrypoint python speed-test main.py
+    # Именно так, потому что `docker compose up` stdin в контейнер не прокидывает —
+    # в `up` замер стартует сразу по адресу из SPEED_TEST_URL.
+    stdin_open: true
+    # Аккуратные сигналы: Ctrl+C -> KeyboardInterrupt -> статистика по выполненным запросам
+    init: true
+    stop_signal: SIGINT
+    # На Linux host-сеть убирает NAT и даёт более честный замер (в Docker Desktop не работает)
+    # network_mode: host
